@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<title>My Bus Commute</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --card-highlight: #1e3a5f;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #38bdf8;
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --border: #334155;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 16px;
+    padding-top: env(safe-area-inset-top, 16px);
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  .header { text-align: center; margin-bottom: 20px; }
+  .header h1 { font-size: 1.3rem; font-weight: 600; margin-bottom: 12px; }
+
+  .toggle-wrap {
+    display: flex;
+    background: var(--card);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 20px;
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .toggle-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+  }
+
+  .departures { display: flex; flex-direction: column; gap: 10px; }
+  .dep-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 14px 16px;
+    border-left: 4px solid var(--border);
+    transition: all 0.2s;
+  }
+  .dep-card.recommended {
+    background: var(--card-highlight);
+    border-left-color: var(--accent);
+  }
+  .dep-card .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .route-badge {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 1rem;
+  }
+  .minutes-away { font-size: 1.4rem; font-weight: 700; }
+  .minutes-label { font-size: 0.75rem; color: var(--text-dim); }
+  .headsign { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 4px; }
+  .time-info { font-size: 0.8rem; color: var(--text-dim); }
+  .delay-tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+  }
+  .delay-tag.on-time { background: rgba(74,222,128,0.15); color: var(--green); }
+  .delay-tag.delayed { background: rgba(251,191,36,0.15); color: var(--amber); }
+  .delay-tag.scheduled { background: rgba(148,163,184,0.15); color: var(--text-dim); }
+  .rec-tag {
+    font-size: 0.7rem;
+    background: rgba(56,189,248,0.2);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+  }
+  .stop-name { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; }
+
+  .status {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+  }
+
+  .manage-section { margin-top: 24px; }
+  .manage-toggle {
+    width: 100%;
+    padding: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-align: center;
+  }
+  .manage-panel {
+    display: none;
+    margin-top: 12px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .manage-panel.open { display: block; }
+
+  .saved-stop {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .saved-stop:last-child { border-bottom: none; }
+  .saved-stop .info { font-size: 0.85rem; }
+  .saved-stop .dir-tag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(56,189,248,0.15);
+    color: var(--accent);
+  }
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--red);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 4px 8px;
+  }
+
+  .add-section { margin-top: 16px; }
+  .add-section h3 { font-size: 0.9rem; margin-bottom: 10px; color: var(--text); }
+  .search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .search-row input {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+  .search-row button, .action-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .action-btn { margin-top: 8px; }
+  .result-list {
+    max-height: 250px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .result-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    background: var(--bg);
+    border: 1px solid transparent;
+  }
+  .result-item:hover, .result-item.selected {
+    border-color: var(--accent);
+    background: rgba(56,189,248,0.08);
+  }
+  .step-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .dir-select { display: flex; gap: 8px; margin-top: 8px; }
+  .dir-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  .dir-btn.selected {
+    border-color: var(--accent);
+    background: rgba(56,189,248,0.15);
+    color: var(--accent);
+  }
+  .route-filter-note {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+  .refresh-info {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 12px;
+  }
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>My Bus Commute</h1>
+</div>
+
+<div class="toggle-wrap">
+  <button class="toggle-btn active" data-dir="in" onclick="setDirection('in')">Commuting In</button>
+  <button class="toggle-btn" data-dir="out" onclick="setDirection('out')">Commuting Out</button>
+</div>
+
+<div id="departures-area" class="departures">
+  <div class="status"><div class="spinner"></div> Loading...</div>
+</div>
+
+<div class="refresh-info" id="refresh-info"></div>
+
+<div class="manage-section">
+  <button class="manage-toggle" onclick="toggleManage()">Manage My Stops</button>
+  <div class="manage-panel" id="manage-panel">
+    <h3>Saved Stops</h3>
+    <div id="saved-stops-list"></div>
+
+    <div class="add-section">
+      <h3>Add a Stop</h3>
+      <div class="step-label">Step 1: Search by route number</div>
+      <div class="search-row">
+        <input type="text" id="route-search" placeholder="e.g. 49, E Line, 550" onkeydown="if(event.key==='Enter')searchRoutes()">
+        <button onclick="searchRoutes()">Search</button>
+      </div>
+      <div id="route-results" class="result-list"></div>
+      <div id="stop-step" style="display:none">
+        <div class="step-label">Step 2: Pick your stop</div>
+        <div id="stop-results" class="result-list"></div>
+      </div>
+      <div id="dir-step" style="display:none">
+        <div class="step-label">Step 3: Which direction?</div>
+        <div class="dir-select">
+          <button class="dir-btn" onclick="selectDir('in')">Commuting In</button>
+          <button class="dir-btn" onclick="selectDir('out')">Commuting Out</button>
+        </div>
+        <div class="route-filter-note" id="filter-note"></div>
+        <button class="action-btn" onclick="saveStop()" id="save-btn" style="display:none;width:100%">Save Stop</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const OBA_BASE = 'https://api.pugetsound.onebusaway.org/api/where';
+const OBA_KEY = 'TEST';
+const STORAGE_KEY = 'myBusCommute_stops';
+
+let currentDirection = 'in';
+let refreshTimer = null;
+let addState = { route: null, stop: null, direction: null };
+
+// --- localStorage persistence ---
+
+function getSavedStops() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch { return []; }
+}
+
+function setSavedStops(stops) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
+}
+
+// --- OBA API ---
+
+async function obaGet(endpoint, params = {}) {
+  params.key = OBA_KEY;
+  const qs = new URLSearchParams(params).toString();
+  const url = `${OBA_BASE}/${endpoint}.json?${qs}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`OBA API error: ${resp.status}`);
+  const data = await resp.json();
+  if (data.code !== 200) throw new Error(`OBA response code: ${data.code}`);
+  return data.data;
+}
+
+function getEffectiveTime(arrival) {
+  // CRITICAL: Use predicted time when available.
+  // This ensures delayed buses still show up.
+  // A bus scheduled at 7:00 but delayed to 7:30 shows at 7:25.
+  if (arrival.predicted && arrival.predictedDepartureTime > 0) {
+    return arrival.predictedDepartureTime;
+  }
+  return arrival.scheduledDepartureTime;
+}
+
+// --- Direction toggle ---
+
+function setDirection(dir) {
+  currentDirection = dir;
+  document.querySelectorAll('.toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.dir === dir);
+  });
+  loadDepartures();
+}
+
+// --- Load and render departures ---
+
+async function loadDepartures() {
+  const area = document.getElementById('departures-area');
+  area.innerHTML = '<div class="status"><div class="spinner"></div> Loading...</div>';
+
+  const stops = getSavedStops().filter(s => s.direction === currentDirection);
+
+  if (stops.length === 0) {
+    const dirLabel = currentDirection === 'in' ? 'Commuting In' : 'Commuting Out';
+    area.innerHTML = `<div class="status">
+      No stops saved for "${dirLabel}".<br>
+      <span style="font-size:0.85rem">Tap "Manage My Stops" below to add some.</span>
+    </div>`;
+    document.getElementById('refresh-info').textContent = '';
+    scheduleRefresh();
+    return;
+  }
+
+  try {
+    const nowMs = Date.now();
+    const allDepartures = [];
+
+    // Fetch arrivals for all saved stops in parallel
+    const results = await Promise.allSettled(
+      stops.map(async (savedStop) => {
+        const data = await obaGet(`arrivals-and-departures-for-stop/${savedStop.id}`, {
+          minutesBefore: 5,
+          minutesAfter: 60
+        });
+
+        // Build route lookup from references
+        const routeMap = {};
+        for (const r of (data.references?.routes || [])) {
+          routeMap[r.id] = { shortName: r.shortName || '', longName: r.longName || '' };
+        }
+
+        for (const ad of (data.entry?.arrivalsAndDepartures || [])) {
+          // Apply route filter if set
+          if (savedStop.route_filter && !savedStop.route_filter.includes(ad.routeId)) {
+            continue;
+          }
+
+          const effTime = getEffectiveTime(ad);
+
+          // CRITICAL: Keep if effective time is in the future
+          // This is what makes delayed buses show up
+          if (effTime <= nowMs) continue;
+
+          const routeInfo = routeMap[ad.routeId] || {};
+          const delayMs = (ad.predicted && ad.predictedDepartureTime > 0)
+            ? ad.predictedDepartureTime - ad.scheduledDepartureTime
+            : 0;
+
+          allDepartures.push({
+            routeShortName: ad.routeShortName || routeInfo.shortName || '',
+            routeLongName: routeInfo.longName || '',
+            tripHeadsign: ad.tripHeadsign || '',
+            stopName: savedStop.name,
+            effectiveTime: effTime,
+            scheduledTime: ad.scheduledDepartureTime,
+            predicted: ad.predicted || false,
+            delayMinutes: delayMs > 0 ? Math.round(delayMs / 60000) : 0,
+            minutesAway: Math.round((effTime - nowMs) / 60000),
+            numberOfStopsAway: ad.numberOfStopsAway,
+          });
+        }
+      })
+    );
+
+    // Sort by effective time
+    allDepartures.sort((a, b) => a.effectiveTime - b.effectiveTime);
+
+    // Mark best option
+    allDepartures.forEach((d, i) => { d.recommended = (i === 0); });
+
+    renderDepartures(allDepartures);
+    document.getElementById('refresh-info').textContent =
+      `Last updated: ${new Date().toLocaleTimeString()}  \u00b7  Auto-refreshes every 30s`;
+  } catch (e) {
+    area.innerHTML = '<div class="status">Failed to load arrivals. Check your connection.</div>';
+  }
+
+  scheduleRefresh();
+}
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(loadDepartures, 30000);
+}
+
+function renderDepartures(deps) {
+  const area = document.getElementById('departures-area');
+  if (!deps || deps.length === 0) {
+    const dirLabel = currentDirection === 'in' ? 'Commuting In' : 'Commuting Out';
+    area.innerHTML = `<div class="status">
+      No upcoming buses for "${dirLabel}" right now.
+    </div>`;
+    return;
+  }
+
+  area.innerHTML = deps.map(d => {
+    const time = new Date(d.effectiveTime).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+    const schedTime = new Date(d.scheduledTime).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+
+    let delayHtml = '';
+    if (!d.predicted) {
+      delayHtml = '<span class="delay-tag scheduled">Scheduled</span>';
+    } else if (d.delayMinutes > 2) {
+      delayHtml = `<span class="delay-tag delayed">~${d.delayMinutes} min late (was ${schedTime})</span>`;
+    } else {
+      delayHtml = '<span class="delay-tag on-time">On time</span>';
+    }
+
+    const recHtml = d.recommended ? '<span class="rec-tag">BEST</span>' : '';
+
+    let stopsInfo = '';
+    if (d.numberOfStopsAway != null) {
+      stopsInfo = ` \u00b7 ${d.numberOfStopsAway} stop${d.numberOfStopsAway !== 1 ? 's' : ''} away`;
+    }
+
+    return `<div class="dep-card ${d.recommended ? 'recommended' : ''}">
+      <div class="top-row">
+        <div>
+          <span class="route-badge">${esc(d.routeShortName)}</span>
+          ${recHtml}
+        </div>
+        <div style="text-align:right">
+          <div class="minutes-away">${d.minutesAway}<span class="minutes-label"> min</span></div>
+        </div>
+      </div>
+      <div class="headsign">${esc(d.tripHeadsign)}</div>
+      <div class="time-info">
+        ${time} ${delayHtml}${stopsInfo}
+      </div>
+      <div class="stop-name">at ${esc(d.stopName)}</div>
+    </div>`;
+  }).join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+// --- Manage stops ---
+
+function toggleManage() {
+  const panel = document.getElementById('manage-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) renderSavedStops();
+}
+
+function renderSavedStops() {
+  const list = document.getElementById('saved-stops-list');
+  const stops = getSavedStops();
+  if (stops.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:8px 0">No stops saved yet.</div>';
+    return;
+  }
+  list.innerHTML = stops.map((s, i) => {
+    const dirLabel = s.direction === 'in' ? 'In' : 'Out';
+    const filterInfo = s.route_filter ? ` (${s.route_filter.map(r => r.replace(/^1_/, '')).join(', ')})` : '';
+    return `<div class="saved-stop">
+      <div class="info">
+        ${esc(s.name)} <span class="dir-tag">${dirLabel}</span>
+        <span style="font-size:0.7rem;color:var(--text-dim)">${esc(filterInfo)}</span>
+      </div>
+      <button class="remove-btn" onclick="removeStop(${i})">Remove</button>
+    </div>`;
+  }).join('');
+}
+
+function removeStop(index) {
+  const stops = getSavedStops();
+  stops.splice(index, 1);
+  setSavedStops(stops);
+  renderSavedStops();
+  loadDepartures();
+}
+
+// --- Add stop flow ---
+
+let routesCache = null;
+
+async function searchRoutes() {
+  const q = document.getElementById('route-search').value.trim().toLowerCase();
+  if (!q) return;
+  const results = document.getElementById('route-results');
+  results.innerHTML = '<div class="spinner"></div> Searching...';
+  document.getElementById('stop-step').style.display = 'none';
+  document.getElementById('dir-step').style.display = 'none';
+  addState = { route: null, stop: null, direction: null };
+
+  try {
+    // Cache the full route list - it doesn't change often
+    if (!routesCache) {
+      const data = await obaGet('routes-for-agency/1');
+      routesCache = data.list || [];
+    }
+
+    const matches = routesCache.filter(r => {
+      const short = (r.shortName || '').toLowerCase();
+      const long = (r.longName || '').toLowerCase();
+      const desc = (r.description || '').toLowerCase();
+      return short.includes(q) || long.includes(q) || desc.includes(q);
+    }).map(r => ({
+      id: r.id,
+      shortName: r.shortName || '',
+      longName: r.longName || '',
+      description: r.description || '',
+    }));
+
+    if (matches.length === 0) {
+      results.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem">No routes found.</div>';
+      return;
+    }
+    results.innerHTML = matches.map(r =>
+      `<div class="result-item" onclick="selectRoute(this, '${attr(r.id)}', '${attr(r.shortName)}')">
+        <strong>${esc(r.shortName)}</strong> - ${esc(r.longName || r.description)}
+      </div>`
+    ).join('');
+  } catch (e) {
+    results.innerHTML = '<div style="color:var(--red);font-size:0.85rem">Search failed. Check your connection.</div>';
+  }
+}
+
+async function selectRoute(el, routeId, routeName) {
+  addState.route = { id: routeId, name: routeName };
+  addState.stop = null;
+  addState.direction = null;
+
+  document.querySelectorAll('#route-results .result-item').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+
+  const stopStep = document.getElementById('stop-step');
+  const stopResults = document.getElementById('stop-results');
+  stopStep.style.display = 'block';
+  stopResults.innerHTML = '<div class="spinner"></div> Loading stops...';
+  document.getElementById('dir-step').style.display = 'none';
+
+  try {
+    const data = await obaGet(`stops-for-route/${routeId}`);
+
+    // Build stop lookup from references
+    const stopMap = {};
+    for (const s of (data.references?.stops || [])) {
+      stopMap[s.id] = { id: s.id, name: s.name || '', lat: s.lat, lon: s.lon };
+    }
+
+    let html = '';
+    for (const sg of (data.entry?.stopGroupings || [])) {
+      for (const group of (sg.stopGroups || [])) {
+        const dirName = group.name?.name || '';
+        html += `<div style="font-size:0.75rem;color:var(--accent);margin:8px 0 4px;font-weight:600">${esc(dirName)}</div>`;
+        for (const sid of (group.stopIds || [])) {
+          const s = stopMap[sid];
+          if (!s) continue;
+          html += `<div class="result-item" onclick="selectStop(this, '${attr(s.id)}', '${attr(s.name)}')">
+            ${esc(s.name)}
+          </div>`;
+        }
+      }
+    }
+    stopResults.innerHTML = html || '<div style="color:var(--text-dim);font-size:0.85rem">No stops found.</div>';
+  } catch (e) {
+    stopResults.innerHTML = '<div style="color:var(--red);font-size:0.85rem">Failed to load stops.</div>';
+  }
+}
+
+function selectStop(el, stopId, stopName) {
+  addState.stop = { id: stopId, name: stopName };
+  addState.direction = null;
+
+  document.querySelectorAll('#stop-results .result-item').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+
+  document.getElementById('dir-step').style.display = 'block';
+  document.getElementById('filter-note').textContent =
+    addState.route ? `Will filter to route ${addState.route.name} at this stop.` : '';
+  document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('save-btn').style.display = 'none';
+}
+
+function selectDir(dir) {
+  addState.direction = dir;
+  document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  document.getElementById('save-btn').style.display = 'block';
+}
+
+function saveStop() {
+  if (!addState.stop || !addState.direction) return;
+
+  const stops = getSavedStops();
+
+  // Check for duplicate
+  if (stops.some(s => s.id === addState.stop.id && s.direction === addState.direction)) {
+    alert('This stop is already saved for this direction.');
+    return;
+  }
+
+  const newStop = {
+    id: addState.stop.id,
+    name: addState.stop.name,
+    direction: addState.direction,
+  };
+  if (addState.route) {
+    newStop.route_filter = [addState.route.id];
+  }
+
+  stops.push(newStop);
+  setSavedStops(stops);
+
+  // Reset form
+  addState = { route: null, stop: null, direction: null };
+  document.getElementById('route-results').innerHTML = '';
+  document.getElementById('stop-step').style.display = 'none';
+  document.getElementById('dir-step').style.display = 'none';
+  document.getElementById('route-search').value = '';
+
+  renderSavedStops();
+  loadDepartures();
+}
+
+// Helper to escape strings for use in HTML attributes
+function attr(s) {
+  return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// --- Init ---
+loadDepartures();
+</script>
+</body>
+</html>
